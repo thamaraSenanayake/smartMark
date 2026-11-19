@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../constants/theme.dart';
 import '../../data/mock_data.dart';
 import 'm3_grading_overlay.dart';
@@ -13,6 +15,12 @@ class CameraViewfinderScreen extends StatefulWidget {
 
 class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
     with SingleTickerProviderStateMixin {
+  CameraController? _cameraController;
+  List<CameraDescription> _cameras = [];
+  bool _isCameraInitialized = false;
+  String? _cameraErrorMessage;
+  bool _isCapturing = false;
+
   bool isFlashOn = false;
   bool isBatchMode = true;
   bool isCornerStabilized = false;
@@ -28,47 +36,156 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    // Simulate real-time contour lock
-    _startSimulatedLock();
+    _initCamera();
   }
 
-  void _startSimulatedLock() {
-    _stabilizationTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _cameraErrorMessage = "No cameras detected on this device.";
+        });
+        return;
+      }
+
+      // Select back / rear camera for document scanning
+      final camera = _cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => _cameras.first,
+      );
+
+      _cameraController = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+
+      await _cameraController!.initialize();
+      if (!mounted) return;
+
+      setState(() {
+        _isCameraInitialized = true;
+        _cameraErrorMessage = null;
+      });
+
+      _startContourLock();
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        lockProgress += 0.05;
+        _cameraErrorMessage = "Camera access error: $e";
+      });
+    }
+  }
+
+  void _startContourLock() {
+    _stabilizationTimer?.cancel();
+    _stabilizationTimer = Timer.periodic(const Duration(milliseconds: 120), (timer) {
+      if (!mounted) return;
+      setState(() {
+        lockProgress += 0.08;
         if (lockProgress >= 1.0) {
           lockProgress = 1.0;
           isCornerStabilized = true;
           timer.cancel();
 
-          // Auto-trigger capture after 600ms of stable lock
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) {
-              _triggerCapture();
-            }
-          });
+          // Auto-trigger capture in batch mode when 4 corners stabilize
+          if (isBatchMode) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted && !_isCapturing) {
+                _triggerCapture();
+              }
+            });
+          }
         }
       });
     });
   }
 
-  void _triggerCapture() {
-    // Navigate to M3 Grading Review & Instant Overlay
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => InstantVerificationScreen(
-          studentScan: MockData.studentScans[0], // Alex Perera's test paper
-          isBatchMode: isBatchMode,
+  Future<void> _toggleFlash() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    try {
+      final nextState = !isFlashOn;
+      await _cameraController!.setFlashMode(
+        nextState ? FlashMode.torch : FlashMode.off,
+      );
+      setState(() => isFlashOn = nextState);
+    } catch (_) {}
+  }
+
+  Future<void> _triggerCapture() async {
+    if (_isCapturing) return;
+    setState(() => _isCapturing = true);
+
+    String? capturedPath;
+
+    // 1. Try real camera capture
+    if (_cameraController != null && _isCameraInitialized) {
+      try {
+        final XFile photo = await _cameraController!.takePicture();
+        capturedPath = photo.path;
+      } catch (e) {
+        debugPrint("Camera capture error: $e");
+      }
+    }
+
+    // 2. If camera not available (e.g. desktop/simulator without camera permission), allow picking image
+    if (capturedPath == null || capturedPath.isEmpty) {
+      try {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+        if (image != null) {
+          capturedPath = image.path;
+        }
+      } catch (e) {
+        debugPrint("Image picker error: $e");
+      }
+    }
+
+    if (capturedPath != null && capturedPath.isNotEmpty) {
+      // Create real scan entry
+      final realScan = MockData.createScanFromCamera(imagePath: capturedPath);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InstantVerificationScreen(
+            studentScan: realScan,
+            isBatchMode: isBatchMode,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      if (mounted) {
+        setState(() => _isCapturing = false);
+      }
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final realScan = MockData.createScanFromCamera(imagePath: image.path);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InstantVerificationScreen(
+            studentScan: realScan,
+            isBatchMode: isBatchMode,
+          ),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _stabilizationTimer?.cancel();
+    _cameraController?.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -80,38 +197,38 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Simulated camera view with authentic test paper
-          Center(
-            child: AspectRatio(
-              aspectRatio: 3 / 4,
-              child: Image.asset(
-                "assets/images/science_exam_paper.jpg",
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[900],
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.document_scanner, color: Colors.white30, size: 80),
-                  );
-                },
+          // Live Real Camera Feed
+          if (_isCameraInitialized && _cameraController != null)
+            Center(
+              child: CameraPreview(_cameraController!),
+            )
+          else if (_cameraErrorMessage != null)
+            _buildCameraFallback()
+          else
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: AppColors.brandIndigo),
+                  SizedBox(height: 16),
+                  Text(
+                    "Connecting to optical camera feed...",
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
               ),
             ),
-          ),
 
-          // Dark camera viewfinder vignette
-          Container(
-            color: Colors.black.withOpacity(0.35),
-          ),
-
-          // 4-Corner OpenCV Guide Pins & Perspective Alignment Box
-          CustomPaint(
-            size: Size.infinite,
-            painter: _CornerGuidePainter(
-              progress: lockProgress,
-              isStabilized: isCornerStabilized,
-              pulse: _pulseController.value,
+          // 4-Corner OpenCV ML Guide Pins
+          if (_isCameraInitialized)
+            CustomPaint(
+              size: Size.infinite,
+              painter: _CornerGuidePainter(
+                progress: lockProgress,
+                isStabilized: isCornerStabilized,
+                pulse: _pulseController.value,
+              ),
             ),
-          ),
 
           // Top Camera Controls Bar
           SafeArea(
@@ -171,9 +288,7 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
                           color: isFlashOn ? AppColors.warningAmber : Colors.white,
                           size: 26,
                         ),
-                        onPressed: () {
-                          setState(() => isFlashOn = !isFlashOn);
-                        },
+                        onPressed: _toggleFlash,
                       ),
                     ],
                   ),
@@ -212,7 +327,7 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
               child: Column(
                 children: [
                   const Text(
-                    "Align exam margins with 4 corner pins",
+                    "Point camera at student answer sheet",
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -223,16 +338,15 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Gallery / Test Paper Fallback
+                      // Import / Pick from gallery fallback
                       IconButton(
+                        tooltip: "Import photo",
                         icon: const Icon(Icons.photo_library_outlined, color: Colors.white70, size: 28),
-                        onPressed: () {
-                          _triggerCapture();
-                        },
+                        onPressed: _pickFromGallery,
                       ),
                       // Shutter Button
                       GestureDetector(
-                        onTap: _triggerCapture,
+                        onTap: _isCapturing ? null : _triggerCapture,
                         child: Container(
                           width: 76,
                           height: 76,
@@ -248,16 +362,24 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
                                   ? AppColors.successGreen
                                   : Colors.white,
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.black87, size: 30),
+                            child: _isCapturing
+                                ? const Center(
+                                    child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.brandIndigo),
+                                  )
+                                : const Icon(Icons.camera_alt, color: Colors.black87, size: 30),
                           ),
                         ),
                       ),
-                      // Rubric Preview Shortcut
+                      // Active rubric indicator
                       IconButton(
-                        icon: const Icon(Icons.receipt_long_outlined, color: Colors.white70, size: 28),
+                        tooltip: "Active rubric key",
+                        icon: const Icon(Icons.rule, color: Colors.white70, size: 28),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Active: Science Term 1 Rubric v2.1")),
+                            const SnackBar(
+                              content: Text("Grading against Rubric v2.1 (10 Questions - 100 Pts)"),
+                              backgroundColor: AppColors.brandIndigo,
+                            ),
                           );
                         },
                       ),
@@ -268,6 +390,42 @@ class _CameraViewfinderScreenState extends State<CameraViewfinderScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCameraFallback() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.videocam_off_outlined, color: Colors.white54, size: 56),
+            const SizedBox(height: 16),
+            const Text(
+              "Camera Not Available",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _cameraErrorMessage ?? "Camera permission required to scan student papers.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brandIndigo,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              icon: const Icon(Icons.photo_library),
+              label: const Text("Select Sheet Photo from Gallery"),
+              onPressed: _pickFromGallery,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -307,7 +465,6 @@ class _CornerGuidePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 4 Corner coordinates representing document bounding polygon
     final left = size.width * 0.10;
     final right = size.width * 0.90;
     final top = size.height * 0.18;
@@ -315,30 +472,25 @@ class _CornerGuidePainter extends CustomPainter {
 
     final color = isStabilized ? AppColors.successGreen : AppColors.brandIndigo;
 
-    // Corner guides length
     const len = 34.0;
     final paint = Paint()
       ..color = color
       ..strokeWidth = isStabilized ? 4.0 : 3.0
       ..style = PaintingStyle.stroke;
 
-    // Top-Left
+    // 4 Corners
     canvas.drawLine(Offset(left, top), Offset(left + len, top), paint);
     canvas.drawLine(Offset(left, top), Offset(left, top + len), paint);
 
-    // Top-Right
     canvas.drawLine(Offset(right, top), Offset(right - len, top), paint);
     canvas.drawLine(Offset(right, top), Offset(right, top + len), paint);
 
-    // Bottom-Left
     canvas.drawLine(Offset(left, bottom), Offset(left + len, bottom), paint);
     canvas.drawLine(Offset(left, bottom), Offset(left, bottom - len), paint);
 
-    // Bottom-Right
     canvas.drawLine(Offset(right, bottom), Offset(right - len, bottom), paint);
     canvas.drawLine(Offset(right, bottom), Offset(right, bottom - len), paint);
 
-    // Guide Frame Outline
     final framePaint = Paint()
       ..color = color.withOpacity(isStabilized ? 0.35 : 0.15)
       ..strokeWidth = 1.5
@@ -346,7 +498,6 @@ class _CornerGuidePainter extends CustomPainter {
 
     canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), framePaint);
 
-    // Center Scanning Reticle
     final center = Offset(size.width / 2, (top + bottom) / 2);
     final reticlePaint = Paint()
       ..color = color.withOpacity(0.4)

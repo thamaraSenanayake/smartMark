@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/theme.dart';
+import '../../data/mock_data.dart';
 import '../../models/assessment.dart';
 import '../../widgets/exam_overlay_painter.dart';
 import 'm2_camera_viewfinder.dart';
@@ -448,17 +449,24 @@ class _InstantVerificationScreenState extends State<InstantVerificationScreen> {
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     onPressed: () {
+                      if (!MockData.studentScans.any((s) => s.id == scan.id)) {
+                        MockData.addScan(scan);
+                      }
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text("Saved ${scan.name} (${scan.totalScore.toStringAsFixed(0)}/100)"),
+                          content: Text("Saved ${scan.name} (${scan.totalScore.toStringAsFixed(0)}/100) to batch queue."),
                           backgroundColor: AppColors.successGreen,
                         ),
                       );
-                      // Auto-reopens camera in batch mode
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CameraViewfinderScreen()),
-                      );
+                      if (widget.isBatchMode) {
+                        // Auto-reopens camera in batch mode
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CameraViewfinderScreen()),
+                        );
+                      } else {
+                        Navigator.pop(context);
+                      }
                     },
                   ),
                 ),

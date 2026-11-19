@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>SmartMark requires camera access to scan student assessment papers.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SmartMark requires microphone access for camera initialization.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SmartMark requires photo library access to import student exam papers.</string>
 </dict>
 </plist>

@@ -27,6 +27,7 @@ class _QuestionAnalyticsScreenState extends State<QuestionAnalyticsScreen> {
 
     final blindSpotCount = MockData.itemAnalytics.where((i) => i.isBlindSpot).length;
     final ambiguousCount = MockData.itemAnalytics.where((i) => i.discriminationIndex < 0.2).length;
+    final hasScans = MockData.studentScans.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -87,36 +88,46 @@ class _QuestionAnalyticsScreenState extends State<QuestionAnalyticsScreen> {
               Expanded(
                 child: CustomCard(
                   borderRadius: AppTheme.radiusWeb,
-                  backgroundColor: AppColors.errorBackdrop,
-                  border: Border.all(color: AppColors.errorBorder),
+                  backgroundColor: blindSpotCount > 0 ? AppColors.errorBackdrop : AppColors.cardBg,
+                  border: Border.all(color: blindSpotCount > 0 ? AppColors.errorBorder : AppColors.borderLight),
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.errorRose,
+                          color: blindSpotCount > 0 ? AppColors.errorRose : AppColors.brandIndigoLight,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                        child: Icon(
+                          blindSpotCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                          color: blindSpotCount > 0 ? Colors.white : AppColors.brandIndigo,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "2 Critical Blind-Spots Detected",
+                              hasScans
+                                  ? "$blindSpotCount Critical Blind-Spots Detected"
+                                  : "Awaiting Assessment Data",
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14,
-                                color: AppColors.errorRose,
+                                color: blindSpotCount > 0 ? AppColors.errorRose : AppColors.primaryNavy,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              "Q7 (Thermodynamics) & Q11 (Kirchhoff's Law) fell below 50% class passing benchmark.",
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              hasScans
+                                  ? (blindSpotCount > 0
+                                      ? "Questions fell below the 50% class passing threshold."
+                                      : "All evaluated questions exceeded the passing benchmark.")
+                                  : "Scan papers with the teacher camera to calculate item difficulty.",
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -129,36 +140,46 @@ class _QuestionAnalyticsScreenState extends State<QuestionAnalyticsScreen> {
               Expanded(
                 child: CustomCard(
                   borderRadius: AppTheme.radiusWeb,
-                  backgroundColor: AppColors.warningBackdrop,
-                  border: Border.all(color: AppColors.warningBorder),
+                  backgroundColor: ambiguousCount > 0 ? AppColors.warningBackdrop : AppColors.cardBg,
+                  border: Border.all(color: ambiguousCount > 0 ? AppColors.warningBorder : AppColors.borderLight),
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.warningAmber,
+                          color: ambiguousCount > 0 ? AppColors.warningAmber : AppColors.brandIndigoLight,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.psychology_outlined, color: Colors.white, size: 24),
+                        child: Icon(
+                          Icons.psychology_outlined,
+                          color: ambiguousCount > 0 ? Colors.white : AppColors.brandIndigo,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "1 Ambiguous Item (Low DI)",
+                              hasScans
+                                  ? "$ambiguousCount Ambiguous Items (Low DI)"
+                                  : "Discrimination Index Pending",
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14,
-                                color: AppColors.warningAmber,
+                                color: ambiguousCount > 0 ? AppColors.warningAmber : AppColors.primaryNavy,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              "Q11 has DI = 0.08. Top-quartile students failed at equal rates due to confusing node arrows.",
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              hasScans
+                                  ? (ambiguousCount > 0
+                                      ? "Items with DI < 0.20 indicate potential ambiguous wording."
+                                      : "High item discrimination across student scoring brackets.")
+                                  : "Correlates top vs bottom student quartile outcomes.",
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -203,7 +224,29 @@ class _QuestionAnalyticsScreenState extends State<QuestionAnalyticsScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ...items.map((item) => ItemMatrixBar(item: item)),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.bar_chart_outlined, size: 48, color: AppColors.textSecondary),
+                          SizedBox(height: 12),
+                          Text(
+                            "No Question Responses Recorded",
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primaryNavy),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "Once papers are scanned on the mobile scanner, per-question correct/incorrect ratios will appear here.",
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...items.map((item) => ItemMatrixBar(item: item)),
               ],
             ),
           ),

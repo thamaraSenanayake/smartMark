@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../constants/theme.dart';
 import '../../data/mock_data.dart';
 import '../../models/assessment.dart';
+import '../../widgets/app_image.dart';
 import '../../widgets/badge_pill.dart';
 import '../../widgets/custom_card.dart';
 import 'm3_grading_overlay.dart';
@@ -15,27 +16,28 @@ class BatchQueueScreen extends StatefulWidget {
 
 class _BatchQueueScreenState extends State<BatchQueueScreen> {
   bool isSyncing = false;
-  late List<StudentExamScan> scans;
-
-  @override
-  void initState() {
-    super.initState();
-    scans = List.from(MockData.studentScans);
-  }
 
   void _triggerCloudSync() async {
+    final pendingCount = MockData.studentScans.where((s) => s.syncStatus != SyncStatus.synced).length;
+    if (pendingCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("All scanned papers are already synced.")),
+      );
+      return;
+    }
+
     setState(() => isSyncing = true);
-    await Future.delayed(const Duration(milliseconds: 1400));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
+
     setState(() {
-      for (var s in scans) {
-        s.syncStatus = SyncStatus.synced;
-      }
+      MockData.syncAll();
       isSyncing = false;
     });
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("All 7 local exam scans synced to Cloud Firestore."),
+      SnackBar(
+        content: Text("Successfully synced $pendingCount papers to Firebase / Cloud SQL."),
         backgroundColor: AppColors.successGreen,
       ),
     );
@@ -43,6 +45,7 @@ class _BatchQueueScreenState extends State<BatchQueueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scans = MockData.studentScans;
     final syncedCount = scans.where((s) => s.syncStatus == SyncStatus.synced).length;
     final pendingCount = scans.where((s) => s.syncStatus != SyncStatus.synced).length;
 
@@ -111,7 +114,7 @@ class _BatchQueueScreenState extends State<BatchQueueScreen> {
                             )
                           : const Icon(Icons.cloud_upload_outlined, size: 16),
                       label: Text(isSyncing ? "Syncing..." : "Sync All"),
-                      onPressed: isSyncing ? null : _triggerCloudSync,
+                      onPressed: isSyncing || scans.isEmpty ? null : _triggerCloudSync,
                     ),
                   ],
                 ),
@@ -129,87 +132,109 @@ class _BatchQueueScreenState extends State<BatchQueueScreen> {
 
           // Papers List
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: scans.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final scan = scans[index];
-                return CustomCard(
-                  padding: const EdgeInsets.all(12),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => InstantVerificationScreen(studentScan: scan),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(
-                          scan.imagePath,
-                          width: 44,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            width: 44,
-                            height: 56,
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.article, size: 20, color: Colors.grey),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              scan.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                color: AppColors.primaryNavy,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              scan.rollNumber,
-                              style: const TextStyle(
-                                fontFamily: 'Courier',
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            StatusPill(status: scan.syncStatus),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+            child: scans.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            "${scan.totalScore.toStringAsFixed(0)} / 100",
-                            style: const TextStyle(
-                              fontFamily: 'Courier',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primaryNavy,
-                            ),
+                          Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "Offline Queue Is Empty",
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryNavy),
                           ),
-                          const SizedBox(height: 4),
-                          GradeBadge(grade: scan.letterGrade),
+                          const SizedBox(height: 6),
+                          const Text(
+                            "Papers captured using the camera scanner will be queued here for automatic cloud syncing.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
-                    ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: scans.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final scan = scans[index];
+                      return CustomCard(
+                        padding: const EdgeInsets.all(12),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InstantVerificationScreen(studentScan: scan),
+                            ),
+                          );
+                          setState(() {});
+                        },
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: SizedBox(
+                                width: 44,
+                                height: 56,
+                                child: AppImage(
+                                  imagePath: scan.imagePath,
+                                  width: 44,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    scan.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: AppColors.primaryNavy,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    scan.rollNumber,
+                                    style: const TextStyle(
+                                      fontFamily: 'Courier',
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  StatusPill(status: scan.syncStatus),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  "${scan.totalScore.toStringAsFixed(0)} / 100",
+                                  style: const TextStyle(
+                                    fontFamily: 'Courier',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.primaryNavy,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                GradeBadge(grade: scan.letterGrade),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

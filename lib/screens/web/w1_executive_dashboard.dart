@@ -90,6 +90,8 @@ class ExecutiveDashboardScreen extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 760;
+              final hasScans = MockData.studentScans.isNotEmpty;
+
               return GridView.count(
                 crossAxisCount: isWide ? 4 : 2,
                 crossAxisSpacing: 14,
@@ -100,29 +102,29 @@ class ExecutiveDashboardScreen extends StatelessWidget {
                 children: [
                   _buildKpiCard(
                     title: "CLASS AVERAGE",
-                    value: "74.8%",
-                    subtext: "+3.2% vs Baseline",
-                    subColor: AppColors.successGreen,
+                    value: hasScans ? "${MockData.classAverage.toStringAsFixed(1)}%" : "N/A",
+                    subtext: hasScans ? "Calculated from ${MockData.scannedCount} papers" : "No papers marked yet",
+                    subColor: hasScans ? AppColors.successGreen : AppColors.textSecondary,
                     icon: Icons.trending_up,
                   ),
                   _buildKpiCard(
                     title: "TOP SCORE",
-                    value: "98.0%",
-                    subtext: "Senuri F. (SCI-1050)",
+                    value: hasScans ? "${MockData.topScore.toStringAsFixed(1)}%" : "N/A",
+                    subtext: hasScans ? "${MockData.studentScans.first.name} (${MockData.studentScans.first.rollNumber})" : "Awaiting scan",
                     subColor: AppColors.textSecondary,
                     icon: Icons.emoji_events_outlined,
                   ),
                   _buildKpiCard(
                     title: "PASSING RATE",
-                    value: "89.2%",
+                    value: hasScans ? "${MockData.passingRate.toStringAsFixed(1)}%" : "N/A",
                     subtext: "Passing threshold ≥ 40%",
                     subColor: AppColors.brandIndigo,
                     icon: Icons.verified_outlined,
                   ),
                   _buildKpiCard(
                     title: "PAPERS MARKED",
-                    value: "32 / 45",
-                    subtext: "71% Bundle Complete",
+                    value: "${MockData.scannedCount} / ${MockData.activeExam.totalStudents}",
+                    subtext: "${((MockData.scannedCount / MockData.activeExam.totalStudents) * 100).toInt()}% Bundle Complete",
                     subColor: AppColors.warningAmber,
                     icon: Icons.assignment_turned_in_outlined,
                   ),
@@ -202,79 +204,95 @@ class ExecutiveDashboardScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 580),
-                    child: Table(
-                      columnWidths: const {
-                        0: FlexColumnWidth(2),
-                        1: FlexColumnWidth(1.5),
-                        2: FlexColumnWidth(1.2),
-                        3: FlexColumnWidth(1),
-                        4: FlexColumnWidth(1.5),
-                      },
-                      children: [
-                        const TableRow(
-                          decoration: BoxDecoration(
-                            border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 1)),
-                          ),
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text("STUDENT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text("INDEX ID", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text("SCORE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text("GRADE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text("TIMESTAMP", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                            ),
-                          ],
-                        ),
-                        ...MockData.studentScans.take(5).map((s) {
-                          return TableRow(
-                            decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 0.5)),
+                if (MockData.studentScans.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.inventory_2_outlined, color: AppColors.textSecondary, size: 36),
+                          SizedBox(height: 8),
+                          Text("No papers marked yet", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                          SizedBox(height: 4),
+                          Text("Papers scanned with the teacher camera will automatically synchronize here.", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 580),
+                      child: Table(
+                        columnWidths: const {
+                          0: FlexColumnWidth(2),
+                          1: FlexColumnWidth(1.5),
+                          2: FlexColumnWidth(1.2),
+                          3: FlexColumnWidth(1),
+                          4: FlexColumnWidth(1.5),
+                        },
+                        children: [
+                          const TableRow(
+                            decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 1)),
                             ),
                             children: [
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primaryNavy)),
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text("STUDENT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Text(s.rollNumber, style: const TextStyle(fontFamily: 'Courier', fontSize: 12, color: AppColors.textSecondary)),
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text("INDEX ID", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Text("${s.totalScore.toStringAsFixed(0)} / 100", style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.w700, fontSize: 13)),
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text("SCORE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Text(s.letterGrade, style: TextStyle(fontWeight: FontWeight.w800, color: s.letterGrade == 'A' ? AppColors.successGreen : AppColors.brandIndigo)),
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text("GRADE", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                               ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 10),
-                                child: Text("Just now", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text("TIMESTAMP", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                               ),
                             ],
-                          );
-                        }),
-                      ],
+                          ),
+                          ...MockData.studentScans.take(5).map((s) {
+                            return TableRow(
+                              decoration: const BoxDecoration(
+                                border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 0.5)),
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primaryNavy)),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Text(s.rollNumber, style: const TextStyle(fontFamily: 'Courier', fontSize: 12, color: AppColors.textSecondary)),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Text("${s.totalScore.toStringAsFixed(0)} / 100", style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.w700, fontSize: 13)),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Text(s.letterGrade, style: TextStyle(fontWeight: FontWeight.w800, color: s.letterGrade == 'A' ? AppColors.successGreen : AppColors.brandIndigo)),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 10),
+                                  child: Text("Just now", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                ),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -344,41 +362,56 @@ class ExecutiveDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildBlindSpotSummary(BuildContext context) {
+    final blindSpots = MockData.itemAnalytics.where((i) => i.isBlindSpot).toList();
+    final hasBlindSpot = blindSpots.isNotEmpty;
+
     return CustomCard(
       borderRadius: AppTheme.radiusWeb,
-      backgroundColor: AppColors.errorBackdrop,
-      border: Border.all(color: AppColors.errorBorder),
+      backgroundColor: hasBlindSpot ? AppColors.errorBackdrop : AppColors.cardBg,
+      border: Border.all(color: hasBlindSpot ? AppColors.errorBorder : AppColors.borderLight),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.report_problem_outlined, color: AppColors.errorRose, size: 20),
-              SizedBox(width: 8),
+              Icon(
+                hasBlindSpot ? Icons.report_problem_outlined : Icons.check_circle_outline,
+                color: hasBlindSpot ? AppColors.errorRose : AppColors.successGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
               Text(
-                "Curriculum Blind-Spot Alert",
+                hasBlindSpot ? "Curriculum Blind-Spot Alert" : "Curriculum Assessment Status",
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.errorRose,
+                  color: hasBlindSpot ? AppColors.errorRose : AppColors.primaryNavy,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            "Question 7 (Thermodynamics & Heat Capacity) was failed by 68% of the class.",
-            style: TextStyle(
+          Text(
+            hasBlindSpot
+                ? "Question ${blindSpots.first.questionNumber} (${blindSpots.first.topic}) was failed by ${blindSpots.first.incorrectPercentage.toStringAsFixed(0)}% of students."
+                : (MockData.studentScans.isEmpty
+                    ? "Awaiting scanned papers to identify concept blind spots."
+                    : "No critical blind spots detected. Passing rate standard met."),
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppColors.primaryNavy,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            "Common error: 78% of failed students did not isolate 'c' correctly in Q=mcΔT. Recommendation: Revisit heat capacity step derivation before term exam.",
-            style: TextStyle(
+          Text(
+            hasBlindSpot
+                ? "Common error: ${blindSpots.first.commonMistake}. Recommendation: Revisit concept derivation before term exam."
+                : (MockData.studentScans.isEmpty
+                    ? "Use the mobile camera scanner to mark answer sheets. Analytics compute dynamically in real time."
+                    : "All tested concepts met the standard ≥50% passing criteria."),
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
               height: 1.4,
@@ -387,7 +420,7 @@ class ExecutiveDashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRose,
+              backgroundColor: hasBlindSpot ? AppColors.errorRose : AppColors.brandIndigo,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),

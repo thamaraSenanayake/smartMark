@@ -71,7 +71,8 @@ class _BellCurvePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final keys = distribution.keys.toList();
     final values = distribution.values.toList();
-    final maxVal = values.reduce((a, b) => a > b ? a : b).toDouble();
+    final rawMax = values.isEmpty ? 0 : values.reduce((a, b) => a > b ? a : b).toDouble();
+    final maxVal = rawMax == 0 ? 1.0 : rawMax;
 
     final barWidth = size.width / (keys.length * 1.6);
     final spacing = (size.width - (barWidth * keys.length)) / (keys.length + 1);

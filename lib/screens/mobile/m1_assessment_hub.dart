@@ -23,8 +23,10 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scannedRatio = exam.scannedCount / exam.totalStudents;
-    final remainingCount = exam.totalStudents - exam.scannedCount;
+    final scannedCount = MockData.studentScans.length;
+    final scannedRatio = exam.totalStudents > 0 ? (scannedCount / exam.totalStudents).clamp(0.0, 1.0) : 0.0;
+    final remainingCount = (exam.totalStudents - scannedCount).clamp(0, exam.totalStudents);
+    final pendingSyncCount = MockData.studentScans.where((s) => s.syncStatus != SyncStatus.synced).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -38,16 +40,18 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
         actions: [
           IconButton(
             tooltip: "Batch Sync Queue",
-            icon: const Badge(
-              label: Text("3"),
+            icon: Badge(
+              label: Text("$pendingSyncCount"),
+              isLabelVisible: pendingSyncCount > 0,
               backgroundColor: AppColors.warningAmber,
-              child: Icon(Icons.cloud_sync_outlined),
+              child: const Icon(Icons.cloud_sync_outlined),
             ),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const BatchQueueScreen()),
               );
+              setState(() {});
             },
           ),
           if (widget.onSwitchToWeb != null)
@@ -184,7 +188,7 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
                                 letterSpacing: -0.5,
                               ),
                               children: [
-                                TextSpan(text: "${exam.scannedCount}"),
+                                TextSpan(text: "$scannedCount"),
                                 TextSpan(
                                   text: " / ${exam.totalStudents} papers",
                                   style: const TextStyle(
@@ -236,9 +240,9 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const Text(
-                        "Est. 4 min left",
-                        style: TextStyle(
+                      Text(
+                        scannedCount == 0 ? "Ready to scan" : "In Progress",
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
@@ -267,24 +271,29 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
                 Expanded(
                   child: CustomCard(
                     padding: const EdgeInsets.all(14),
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const BatchQueueScreen()),
                       );
+                      setState(() {});
                     },
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.inventory_2_outlined, color: AppColors.brandIndigo),
-                        SizedBox(height: 8),
-                        Text(
+                        const Icon(Icons.inventory_2_outlined, color: AppColors.brandIndigo),
+                        const SizedBox(height: 8),
+                        const Text(
                           "Offline Queue",
                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                         ),
                         Text(
-                          "3 pending sync",
-                          style: TextStyle(color: AppColors.warningAmber, fontSize: 11, fontWeight: FontWeight.w600),
+                          "$pendingSyncCount pending sync",
+                          style: TextStyle(
+                            color: pendingSyncCount > 0 ? AppColors.warningAmber : AppColors.successGreen,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -321,7 +330,7 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Recent Scanned Roster Snippet
+            // Recently Scanned Section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -334,85 +343,115 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
                     letterSpacing: 0.5,
                   ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BatchQueueScreen()),
-                    );
-                  },
-                  child: const Text("View All", style: TextStyle(fontSize: 12, color: AppColors.brandIndigo)),
-                ),
+                if (MockData.studentScans.isNotEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const BatchQueueScreen()),
+                      );
+                      setState(() {});
+                    },
+                    child: const Text("View All", style: TextStyle(fontSize: 12, color: AppColors.brandIndigo)),
+                  ),
               ],
             ),
-            ...MockData.studentScans.take(3).map((scan) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: CustomCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(
+
+            if (MockData.studentScans.isEmpty)
+              CustomCard(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Column(
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.brandIndigoLight,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          scan.name.substring(0, 1),
-                          style: const TextStyle(
-                            color: AppColors.brandIndigo,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      Icon(Icons.document_scanner_outlined, size: 44, color: AppColors.textSecondary.withOpacity(0.5)),
+                      const SizedBox(height: 12),
+                      const Text(
+                        "No Papers Scanned Yet",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.primaryNavy,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              scan.name,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                            ),
-                            Text(
-                              scan.rollNumber,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "${scan.totalScore.toStringAsFixed(0)} / 100",
-                            style: const TextStyle(
-                              fontFamily: 'Courier',
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: AppColors.primaryNavy,
-                            ),
-                          ),
-                          Text(
-                            "Grade ${scan.letterGrade}",
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: scan.letterGrade == 'A'
-                                  ? AppColors.successGreen
-                                  : AppColors.brandIndigo,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Tap 'START SCANNER' below to point your camera at a student answer sheet.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
-              );
-            }),
+              )
+            else
+              ...MockData.studentScans.take(5).map((scan) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: CustomCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.brandIndigoLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            scan.name.isNotEmpty ? scan.name.substring(0, 1) : "S",
+                            style: const TextStyle(
+                              color: AppColors.brandIndigo,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                scan.name,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                              Text(
+                                scan.rollNumber,
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              "${scan.totalScore.toStringAsFixed(0)} / 100",
+                              style: const TextStyle(
+                                fontFamily: 'Courier',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: AppColors.primaryNavy,
+                              ),
+                            ),
+                            Text(
+                              "Grade ${scan.letterGrade}",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: scan.letterGrade == 'A'
+                                    ? AppColors.successGreen
+                                    : AppColors.brandIndigo,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
           ],
         ),
       ),
@@ -427,11 +466,12 @@ class _AssessmentHubScreenState extends State<AssessmentHubScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CameraViewfinderScreen()),
           );
+          if (mounted) setState(() {});
         },
       ),
     );

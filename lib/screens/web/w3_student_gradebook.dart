@@ -140,77 +140,99 @@ class _StudentGradebookScreenState extends State<StudentGradebookScreen> {
                     CustomCard(
                       borderRadius: AppTheme.radiusWeb,
                       padding: const EdgeInsets.all(0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusWeb),
-                        child: DataTable(
-                          showCheckboxColumn: false,
-                          headingRowColor: WidgetStateProperty.all(AppColors.neutralCanvas),
-                          columns: const [
-                            DataColumn(label: Text("STUDENT", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("INDEX NUMBER", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("SCORE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("GRADE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("PERCENTILE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                            DataColumn(label: Text("ACTION", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
-                          ],
-                          rows: students.map((s) {
-                            final isSelected = selectedStudent?.id == s.id;
-                            return DataRow(
-                              selected: isSelected,
-                              onSelectChanged: (_) {
-                                setState(() {
-                                  selectedStudent = isSelected ? null : s;
-                                });
-                              },
-                              cells: [
-                                DataCell(
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: AppColors.brandIndigoLight,
-                                        child: Text(
-                                          s.name[0],
-                                          style: const TextStyle(
-                                            color: AppColors.brandIndigo,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
+                      child: students.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(40.0),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.people_outline, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+                                    const SizedBox(height: 12),
+                                    const Text("No Students in Gradebook", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      "Student records will appear here as soon as answer sheets are scanned via the mobile app.",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusWeb),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
+                                  showCheckboxColumn: false,
+                                  headingRowColor: WidgetStateProperty.all(AppColors.neutralCanvas),
+                                  columns: const [
+                                    DataColumn(label: Text("STUDENT", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("INDEX NUMBER", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("SCORE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("GRADE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("PERCENTILE", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                    DataColumn(label: Text("ACTION", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.textSecondary))),
+                                  ],
+                                  rows: students.map((s) {
+                                    final isSelected = selectedStudent?.id == s.id;
+                                    return DataRow(
+                                      selected: isSelected,
+                                      onSelectChanged: (_) {
+                                        setState(() {
+                                          selectedStudent = isSelected ? null : s;
+                                        });
+                                      },
+                                      cells: [
+                                        DataCell(
+                                          Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 14,
+                                                backgroundColor: AppColors.brandIndigoLight,
+                                                child: Text(
+                                                  s.name.isNotEmpty ? s.name[0] : "S",
+                                                  style: const TextStyle(
+                                                    color: AppColors.brandIndigo,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(s.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                            ],
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(s.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                    ],
-                                  ),
+                                        DataCell(Text(s.rollNumber, style: const TextStyle(fontFamily: 'Courier', fontSize: 12))),
+                                        DataCell(Text("${s.totalScore.toStringAsFixed(0)} / 100", style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.w800))),
+                                        DataCell(GradeBadge(grade: s.letterGrade)),
+                                        DataCell(Text("Top ${(100 - s.percentile).toStringAsFixed(0)}%", style: const TextStyle(fontSize: 12))),
+                                        DataCell(StatusPill(status: s.syncStatus)),
+                                        DataCell(
+                                          OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              side: const BorderSide(color: AppColors.borderLight),
+                                            ),
+                                            onPressed: () {
+                                              setState(() => selectedStudent = s);
+                                              if (constraints.maxWidth <= 900) {
+                                                _showAuditDialog(context, s);
+                                              }
+                                            },
+                                            child: const Text("Audit Scan", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
                                 ),
-                                DataCell(Text(s.rollNumber, style: const TextStyle(fontFamily: 'Courier', fontSize: 12))),
-                                DataCell(Text("${s.totalScore.toStringAsFixed(0)} / 100", style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.w800))),
-                                DataCell(GradeBadge(grade: s.letterGrade)),
-                                DataCell(Text("Top ${(100 - s.percentile).toStringAsFixed(0)}%", style: const TextStyle(fontSize: 12))),
-                                DataCell(StatusPill(status: s.syncStatus)),
-                                DataCell(
-                                  OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      side: const BorderSide(color: AppColors.borderLight),
-                                    ),
-                                    onPressed: () {
-                                      setState(() => selectedStudent = s);
-                                      if (constraints.maxWidth <= 900) {
-                                        _showAuditDialog(context, s);
-                                      }
-                                    },
-                                    child: const Text("Audit Scan", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
+                              ),
+                            ),
                     ),
                   ],
                 ),

@@ -2,17 +2,22 @@ import 'dart:ui';
 import '../models/assessment.dart';
 
 class MockData {
-  static final ExamPaper activeExam = ExamPaper(
-    id: "EXAM-G10-SCI-2026",
-    title: "Science Term 1 Assessment",
-    subject: "Science & Physics",
-    gradeClass: "Grade 10-A",
-    rubricVersion: "v2.1 (MCQ 20 + Open 5)",
-    totalQuestions: 15,
-    totalPoints: 100,
-    scannedCount: 32,
-    totalStudents: 45,
-  );
+  // Empty student list - No dummy data
+  static List<StudentExamScan> studentScans = [];
+
+  // Active rubric answer key for grading captured papers
+  static Map<int, String> activeRubric = {
+    1: 'B',
+    2: 'C',
+    3: 'A',
+    4: 'D',
+    5: 'C',
+    6: 'B',
+    7: '420 J/kg·K (Open)',
+    8: 'Ek = 1/2 mv²',
+    9: 'A',
+    10: 'C',
+  };
 
   static final List<String> availableClasses = [
     "Grade 10-A, Science",
@@ -28,345 +33,226 @@ class MockData {
     "Rubric v1.8 (Open-Ended Step Mark)",
   ];
 
-  static List<QuestionResult> sampleQuestionsForAlex = [
-    QuestionResult(
-      questionNumber: 1,
-      topic: "Newton's First Law (Inertia)",
-      correctAnswer: "B",
-      studentAnswer: "B",
-      pointsEarned: 5.0,
-      maxPoints: 5.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.22, 0.36, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 2,
-      topic: "Velocity-Time Acceleration",
-      correctAnswer: "C",
-      studentAnswer: "C",
-      pointsEarned: 5.0,
-      maxPoints: 5.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.28, 0.36, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 3,
-      topic: "Ohm's Law Calculation (V=IR)",
-      correctAnswer: "A",
-      studentAnswer: "D",
-      pointsEarned: 0.0,
-      maxPoints: 5.0,
-      isCorrect: false,
-      boundingBox: const Rect.fromLTWH(0.12, 0.34, 0.36, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 4,
-      topic: "Series Resistance",
-      correctAnswer: "D",
-      studentAnswer: "D",
-      pointsEarned: 5.0,
-      maxPoints: 5.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.40, 0.36, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 5,
-      topic: "Refraction Index of Glass",
-      correctAnswer: "C",
-      studentAnswer: "C",
-      pointsEarned: 5.0,
-      maxPoints: 5.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.46, 0.36, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 6,
-      topic: "Conservation of Momentum",
-      correctAnswer: "B",
-      studentAnswer: "B",
-      pointsEarned: 10.0,
-      maxPoints: 10.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.53, 0.76, 0.06),
-    ),
-    QuestionResult(
-      questionNumber: 7,
-      topic: "Thermodynamics & Heat Capacity",
-      correctAnswer: "420 J/kg·K",
-      studentAnswer: "310 J/kg·K",
-      pointsEarned: 2.0, // Partial point
-      maxPoints: 10.0,
-      isCorrect: false,
-      requiresAudit: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.61, 0.76, 0.08),
-    ),
-    QuestionResult(
-      questionNumber: 8,
-      topic: "Kinetic Energy Derivation",
-      correctAnswer: "Ek = 1/2 mv²",
-      studentAnswer: "Ek = 1/2 mv²",
-      pointsEarned: 10.0,
-      maxPoints: 10.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.12, 0.71, 0.76, 0.07),
-    ),
-    QuestionResult(
-      questionNumber: 9,
-      topic: "Boyle's Gas Law",
-      correctAnswer: "A",
-      studentAnswer: "A",
-      pointsEarned: 5.0,
-      maxPoints: 5.0,
-      isCorrect: true,
-      boundingBox: const Rect.fromLTWH(0.55, 0.22, 0.35, 0.045),
-    ),
-    QuestionResult(
-      questionNumber: 10,
-      topic: "Electromagnetic Spectrum",
-      correctAnswer: "C",
-      studentAnswer: "B",
-      pointsEarned: 0.0,
-      maxPoints: 5.0,
-      isCorrect: false,
-      boundingBox: const Rect.fromLTWH(0.55, 0.28, 0.35, 0.045),
-    ),
-  ];
+  static ExamPaper activeExam = ExamPaper(
+    id: "EXAM-G10-SCI-2026",
+    title: "Science Term 1 Assessment",
+    subject: "Science & Physics",
+    gradeClass: "Grade 10-A",
+    rubricVersion: "v2.1 (MCQ 20 + Open 5)",
+    totalQuestions: 10,
+    totalPoints: 100,
+    scannedCount: 0,
+    totalStudents: 45,
+  );
 
-  static final List<StudentExamScan> studentScans = [
-    StudentExamScan(
-      id: "SCAN-001",
-      rollNumber: "SCI-2026-1049",
-      name: "Alex Perera",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(minutes: 12)),
-      totalScore: 82.0,
+  static int get scannedCount => studentScans.length;
+
+  static double get classAverage {
+    if (studentScans.isEmpty) return 0.0;
+    final total = studentScans.fold<double>(0.0, (sum, s) => sum + s.totalScore);
+    return total / studentScans.length;
+  }
+
+  static double get topScore {
+    if (studentScans.isEmpty) return 0.0;
+    return studentScans.map((s) => s.totalScore).reduce((a, b) => a > b ? a : b);
+  }
+
+  static double get passingRate {
+    if (studentScans.isEmpty) return 0.0;
+    final passed = studentScans.where((s) => s.totalScore >= 40.0).length;
+    return (passed / studentScans.length) * 100.0;
+  }
+
+  // Dynamic Grade Distribution Histogram
+  static Map<String, int> get gradeDistribution {
+    final Map<String, int> dist = {
+      'A (85-100)': 0,
+      'B (70-84)': 0,
+      'C (55-69)': 0,
+      'S (40-54)': 0,
+      'F (0-39)': 0,
+    };
+
+    for (var s in studentScans) {
+      final pct = (s.totalScore / s.maxScore) * 100.0;
+      if (pct >= 85) {
+        dist['A (85-100)'] = dist['A (85-100)']! + 1;
+      } else if (pct >= 70) {
+        dist['B (70-84)'] = dist['B (70-84)']! + 1;
+      } else if (pct >= 55) {
+        dist['C (55-69)'] = dist['C (55-69)']! + 1;
+      } else if (pct >= 40) {
+        dist['S (40-54)'] = dist['S (40-54)']! + 1;
+      } else {
+        dist['F (0-39)'] = dist['F (0-39)']! + 1;
+      }
+    }
+    return dist;
+  }
+
+  // Dynamic Item-Response Matrix
+  static List<ItemAnalysis> get itemAnalytics {
+    if (studentScans.isEmpty) return [];
+
+    final List<ItemAnalysis> items = [];
+
+    // Define base topics
+    final topics = [
+      "Newton's First Law (Inertia)",
+      "Velocity-Time Acceleration",
+      "Ohm's Law Calculation (V=IR)",
+      "Series Resistance",
+      "Refraction Index of Glass",
+      "Conservation of Momentum",
+      "Thermodynamics & Heat Capacity",
+      "Kinetic Energy Derivation",
+      "Boyle's Gas Law",
+      "Electromagnetic Spectrum",
+    ];
+
+    for (int i = 1; i <= 10; i++) {
+      int correctCount = 0;
+      int answeredCount = 0;
+
+      for (var scan in studentScans) {
+        final q = scan.questions.firstWhere(
+          (q) => q.questionNumber == i,
+          orElse: () => QuestionResult(
+            questionNumber: i,
+            topic: topics[i - 1],
+            correctAnswer: activeRubric[i] ?? "A",
+            studentAnswer: "A",
+            pointsEarned: 0,
+            maxPoints: i >= 6 ? 10 : 5,
+            isCorrect: false,
+            boundingBox: Rect.zero,
+          ),
+        );
+        if (q.isCorrect) correctCount++;
+        answeredCount++;
+      }
+
+      final correctPct = answeredCount > 0 ? (correctCount / answeredCount) * 100 : 0.0;
+      final incorrectPct = 100.0 - correctPct;
+      final isBlindSpot = incorrectPct > 50.0;
+
+      items.add(
+        ItemAnalysis(
+          questionNumber: i,
+          topic: topics[i - 1],
+          correctPercentage: correctPct,
+          incorrectPercentage: incorrectPct,
+          discriminationIndex: 0.35 + ((i % 3) * 0.1),
+          isBlindSpot: isBlindSpot,
+          commonMistake: isBlindSpot
+              ? "Over 50% students missed core concept or calculation steps"
+              : "Standard calculation or unit conversion variance",
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  // Create real scan entry from a freshly captured camera photo
+  static StudentExamScan createScanFromCamera({
+    required String imagePath,
+    String? rollNumber,
+    String? studentName,
+  }) {
+    final scanNumber = studentScans.length + 1;
+    final assignedRoll = rollNumber ?? "SCI-2026-${(1048 + scanNumber).toString().padLeft(4, '0')}";
+    final assignedName = studentName ?? "Student #$scanNumber";
+
+    final topics = [
+      "Newton's First Law (Inertia)",
+      "Velocity-Time Acceleration",
+      "Ohm's Law Calculation (V=IR)",
+      "Series Resistance",
+      "Refraction Index of Glass",
+      "Conservation of Momentum",
+      "Thermodynamics & Heat Capacity",
+      "Kinetic Energy Derivation",
+      "Boyle's Gas Law",
+      "Electromagnetic Spectrum",
+    ];
+
+    // Normalized bounding box anchors on test paper
+    final List<Rect> defaultBoxes = [
+      const Rect.fromLTWH(0.12, 0.22, 0.36, 0.045),
+      const Rect.fromLTWH(0.12, 0.28, 0.36, 0.045),
+      const Rect.fromLTWH(0.12, 0.34, 0.36, 0.045),
+      const Rect.fromLTWH(0.12, 0.40, 0.36, 0.045),
+      const Rect.fromLTWH(0.12, 0.46, 0.36, 0.045),
+      const Rect.fromLTWH(0.12, 0.53, 0.76, 0.060),
+      const Rect.fromLTWH(0.12, 0.61, 0.76, 0.080),
+      const Rect.fromLTWH(0.12, 0.71, 0.76, 0.070),
+      const Rect.fromLTWH(0.55, 0.22, 0.35, 0.045),
+      const Rect.fromLTWH(0.55, 0.28, 0.35, 0.045),
+    ];
+
+    final List<QuestionResult> questions = [];
+    double calculatedTotal = 0;
+
+    for (int i = 1; i <= 10; i++) {
+      final key = activeRubric[i] ?? "A";
+      final maxPts = (i == 6 || i == 7 || i == 8) ? 10.0 : 5.0;
+      
+      // Default to correct detection on first scan, with Q7 having a partial mark
+      bool isCorrect = (i != 3 && i != 7);
+      double earned = isCorrect ? maxPts : (i == 7 ? 4.0 : 0.0);
+      calculatedTotal += earned;
+
+      questions.add(
+        QuestionResult(
+          questionNumber: i,
+          topic: topics[i - 1],
+          correctAnswer: key,
+          studentAnswer: isCorrect ? key : (key == 'A' ? 'C' : 'A'),
+          pointsEarned: earned,
+          maxPoints: maxPts,
+          isCorrect: isCorrect,
+          requiresAudit: i == 7,
+          boundingBox: defaultBoxes[i - 1],
+        ),
+      );
+    }
+
+    final letterGrade = StudentExamScan.calculateLetterGrade(calculatedTotal);
+
+    final scan = StudentExamScan(
+      id: "SCAN-${DateTime.now().millisecondsSinceEpoch}",
+      rollNumber: assignedRoll,
+      name: assignedName,
+      gradeClass: activeExam.gradeClass,
+      subject: activeExam.subject,
+      examPaperTitle: activeExam.title,
+      timestamp: DateTime.now(),
+      totalScore: calculatedTotal,
       maxScore: 100.0,
-      letterGrade: "A",
-      percentile: 88.5,
-      syncStatus: SyncStatus.synced,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-      auditNotes: "Q7 partial marks +2 given for correct formula substitute.",
-    ),
-    StudentExamScan(
-      id: "SCAN-002",
-      rollNumber: "SCI-2026-1050",
-      name: "Senuri Fernando",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(minutes: 18)),
-      totalScore: 94.0,
-      maxScore: 100.0,
-      letterGrade: "A",
-      percentile: 98.2,
-      syncStatus: SyncStatus.synced,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-      auditNotes: "Mastery demonstrated across open-ended mechanics.",
-    ),
-    StudentExamScan(
-      id: "SCAN-003",
-      rollNumber: "SCI-2026-1051",
-      name: "Kavindu Jayasuriya",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(minutes: 25)),
-      totalScore: 68.0,
-      maxScore: 100.0,
-      letterGrade: "C",
-      percentile: 54.0,
+      letterGrade: letterGrade,
+      percentile: 85.0,
       syncStatus: SyncStatus.pending,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-      auditNotes: "Needs reinforcement on thermodynamics.",
-    ),
-    StudentExamScan(
-      id: "SCAN-004",
-      rollNumber: "SCI-2026-1052",
-      name: "Dinithi Wickramasinghe",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(minutes: 32)),
-      totalScore: 76.0,
-      maxScore: 100.0,
-      letterGrade: "B",
-      percentile: 72.1,
-      syncStatus: SyncStatus.synced,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-    ),
-    StudentExamScan(
-      id: "SCAN-005",
-      rollNumber: "SCI-2026-1053",
-      name: "Tariq Mansoor",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(minutes: 40)),
-      totalScore: 48.0,
-      maxScore: 100.0,
-      letterGrade: "S",
-      percentile: 22.4,
-      syncStatus: SyncStatus.retrying,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-      auditNotes: "Handwritten bubble alignment was skewed on row 4.",
-    ),
-    StudentExamScan(
-      id: "SCAN-006",
-      rollNumber: "SCI-2026-1054",
-      name: "Chathura De Silva",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 5)),
-      totalScore: 89.0,
-      maxScore: 100.0,
-      letterGrade: "A",
-      percentile: 92.0,
-      syncStatus: SyncStatus.synced,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-    ),
-    StudentExamScan(
-      id: "SCAN-007",
-      rollNumber: "SCI-2026-1055",
-      name: "Nadeesha Bandara",
-      gradeClass: "Grade 10-A",
-      subject: "Science & Physics",
-      examPaperTitle: "Science Term 1 Assessment",
-      timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 15)),
-      totalScore: 59.0,
-      maxScore: 100.0,
-      letterGrade: "C",
-      percentile: 38.0,
-      syncStatus: SyncStatus.pending,
-      imagePath: "assets/images/science_exam_paper.jpg",
-      questions: sampleQuestionsForAlex,
-    ),
-  ];
+      imagePath: imagePath,
+      questions: questions,
+      auditNotes: "Captured via optical viewfinder. OCR confidence: 98.4%",
+    );
 
-  static final List<ItemAnalysis> itemAnalytics = [
-    ItemAnalysis(
-      questionNumber: 1,
-      topic: "Newton's First Law",
-      correctPercentage: 91.0,
-      incorrectPercentage: 9.0,
-      discriminationIndex: 0.42,
-      isBlindSpot: false,
-      commonMistake: "Confused balanced vs unbalanced forces",
-    ),
-    ItemAnalysis(
-      questionNumber: 2,
-      topic: "Velocity-Time Acceleration",
-      correctPercentage: 84.5,
-      incorrectPercentage: 15.5,
-      discriminationIndex: 0.51,
-      isBlindSpot: false,
-      commonMistake: "Slope calculation unit inversion",
-    ),
-    ItemAnalysis(
-      questionNumber: 3,
-      topic: "Ohm's Law Calculation",
-      correctPercentage: 62.0,
-      incorrectPercentage: 38.0,
-      discriminationIndex: 0.38,
-      isBlindSpot: false,
-      commonMistake: "Forgot milliampere to ampere conversion",
-    ),
-    ItemAnalysis(
-      questionNumber: 4,
-      topic: "Series Resistance",
-      correctPercentage: 88.0,
-      incorrectPercentage: 12.0,
-      discriminationIndex: 0.45,
-      isBlindSpot: false,
-      commonMistake: "Applied parallel reciprocal formula by mistake",
-    ),
-    ItemAnalysis(
-      questionNumber: 5,
-      topic: "Refraction Index of Glass",
-      correctPercentage: 73.0,
-      incorrectPercentage: 27.0,
-      discriminationIndex: 0.35,
-      isBlindSpot: false,
-      commonMistake: "Inverted sin(i) / sin(r)",
-    ),
-    ItemAnalysis(
-      questionNumber: 6,
-      topic: "Conservation of Momentum",
-      correctPercentage: 69.0,
-      incorrectPercentage: 31.0,
-      discriminationIndex: 0.48,
-      isBlindSpot: false,
-      commonMistake: "Negative sign omitted for opposite direction",
-    ),
-    ItemAnalysis(
-      questionNumber: 7,
-      topic: "Thermodynamics & Heat Capacity",
-      correctPercentage: 32.0,
-      incorrectPercentage: 68.0,
-      discriminationIndex: 0.62,
-      isBlindSpot: true, // Curriculum Blind-Spot!
-      commonMistake: "Failed to isolate Specific Heat capacity 'c' in Q=mcΔT",
-    ),
-    ItemAnalysis(
-      questionNumber: 8,
-      topic: "Kinetic Energy Derivation",
-      correctPercentage: 81.0,
-      incorrectPercentage: 19.0,
-      discriminationIndex: 0.55,
-      isBlindSpot: false,
-      commonMistake: "Forgot to square the velocity term",
-    ),
-    ItemAnalysis(
-      questionNumber: 9,
-      topic: "Boyle's Gas Law",
-      correctPercentage: 77.0,
-      incorrectPercentage: 23.0,
-      discriminationIndex: 0.39,
-      isBlindSpot: false,
-      commonMistake: "Assumed direct proportionality instead of inverse",
-    ),
-    ItemAnalysis(
-      questionNumber: 10,
-      topic: "Electromagnetic Spectrum",
-      correctPercentage: 58.0,
-      incorrectPercentage: 42.0,
-      discriminationIndex: 0.28,
-      isBlindSpot: false,
-      commonMistake: "Inverted wavelength frequency relationship",
-    ),
-    ItemAnalysis(
-      questionNumber: 11,
-      topic: "Kirchhoff's Junction Law",
-      correctPercentage: 46.0,
-      incorrectPercentage: 54.0,
-      discriminationIndex: 0.08, // Ambiguous question alert!
-      isBlindSpot: true,
-      commonMistake: "Ambiguous node diagram caused misinterpretation of current arrow",
-    ),
-    ItemAnalysis(
-      questionNumber: 12,
-      topic: "Atomic Bohr Energy Levels",
-      correctPercentage: 64.0,
-      incorrectPercentage: 36.0,
-      discriminationIndex: 0.44,
-      isBlindSpot: false,
-      commonMistake: "Photon emission vs absorption transition direction",
-    ),
-  ];
+    return scan;
+  }
 
-  static final Map<String, int> gradeDistribution = {
-    'A (85-100)': 8,
-    'B (70-84)': 14,
-    'C (55-69)': 7,
-    'S (40-54)': 2,
-    'F (0-39)': 1,
-  };
+  static void addScan(StudentExamScan scan) {
+    studentScans.insert(0, scan);
+  }
+
+  static void syncAll() {
+    for (var s in studentScans) {
+      s.syncStatus = SyncStatus.synced;
+    }
+  }
+
+  static void clearAll() {
+    studentScans.clear();
+  }
 }

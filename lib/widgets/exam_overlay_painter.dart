@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/theme.dart';
 import '../models/assessment.dart';
+import 'app_image.dart';
 
 class ExamOverlayWidget extends StatelessWidget {
   final String imagePath;
@@ -20,28 +21,13 @@ class ExamOverlayWidget extends StatelessWidget {
       builder: (context, constraints) {
         return Stack(
           children: [
-            // Base scan image
+            // Base scan image (Supports live camera captures, files, and assets)
             ClipRRect(
               borderRadius: BorderRadius.circular(AppTheme.radiusMobile),
-              child: Image.asset(
-                imagePath,
+              child: AppImage(
+                imagePath: imagePath,
                 width: constraints.maxWidth,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 480,
-                    color: Colors.grey[200],
-                    alignment: Alignment.center,
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.description_outlined, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text("Scanned Exam Paper View"),
-                      ],
-                    ),
-                  );
-                },
               ),
             ),
 
